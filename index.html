@@ -1,0 +1,1553 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eval Regression Viewer - Diff two eval runs, case by case</title>
+<meta name="description" content="Drop two or more eval-run files (JSONL, JSON array, or CSV) and get a case-by-case regression diff: new failures, new passes, score deltas, and flaky cases. Runs entirely in your browser.">
+<link rel="canonical" href="https://0xelitesystem.github.io/eval-regression-viewer/">
+<meta property="og:title" content="Eval Regression Viewer - Diff two eval runs, case by case">
+<meta property="og:description" content="Drop two or more eval-run files (JSONL, JSON array, or CSV) and get a case-by-case regression diff: new failures, new passes, score deltas, and flaky cases. Runs entirely in your browser.">
+<meta property="og:url" content="https://0xelitesystem.github.io/eval-regression-viewer/">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230e100d'/%3E%3Cpath d='M7 21l5-9 4 7 3-5 5 8' stroke='%23c9e94f' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Eval Regression Viewer",
+  "description": "Drop two or more eval-run files (JSONL, JSON array, or CSV) and get a case-by-case regression diff: new failures, new passes, score deltas, and flaky cases. Runs entirely in your browser.",
+  "url": "https://0xelitesystem.github.io/eval-regression-viewer/",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Any",
+  "offers": { "@type": "Offer", "price": 0, "priceCurrency": "USD" }
+}
+</script>
+<script>
+(function () {
+  var t = "dark";
+  try {
+    var s = localStorage.getItem("erv-theme");
+    if (s === "light" || s === "dark") t = s;
+  } catch (e) {}
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<style>
+/* ---------- tokens ---------- */
+:root {
+  --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  --bg: #0e100d;
+  --bg-2: #121510;
+  --panel: #161a14;
+  --panel-2: #1b2019;
+  --line: #2b3227;
+  --line-soft: #21261e;
+  --ink: #e7ecdf;
+  --ink-2: #a7b09b;
+  --ink-3: #7b8471;
+  --accent: #c9e94f;
+  --accent-dim: #93ad35;
+  --accent-ink: #151907;
+  --fail: #ff6b5e;
+  --pass: #52d273;
+  --flaky: #f0b429;
+  --info: #58b7ff;
+  --neutral: #8b9385;
+  --fail-soft: rgba(255, 107, 94, 0.13);
+  --pass-soft: rgba(82, 210, 115, 0.13);
+  --flaky-soft: rgba(240, 180, 41, 0.14);
+  --info-soft: rgba(88, 183, 255, 0.13);
+  --neutral-soft: rgba(139, 147, 133, 0.14);
+  --accent-soft: rgba(201, 233, 79, 0.12);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --grid-line: rgba(201, 233, 79, 0.035);
+}
+[data-theme="light"] {
+  --bg: #f1efe6;
+  --bg-2: #eae8dc;
+  --panel: #faf9f2;
+  --panel-2: #f2f0e4;
+  --line: #cfccba;
+  --line-soft: #dedbca;
+  --ink: #20241c;
+  --ink-2: #575e4c;
+  --ink-3: #767d6a;
+  --accent: #55650b;
+  --accent-dim: #6f8410;
+  --accent-ink: #f7fadf;
+  --fail: #b02a37;
+  --pass: #1e7d3c;
+  --flaky: #9c6f00;
+  --info: #175fa8;
+  --neutral: #5c635a;
+  --fail-soft: rgba(176, 42, 55, 0.1);
+  --pass-soft: rgba(30, 125, 60, 0.1);
+  --flaky-soft: rgba(156, 111, 0, 0.12);
+  --info-soft: rgba(23, 95, 168, 0.1);
+  --neutral-soft: rgba(92, 99, 90, 0.12);
+  --accent-soft: rgba(85, 101, 11, 0.1);
+  --shadow: 0 10px 26px rgba(52, 54, 40, 0.12);
+  --grid-line: rgba(32, 36, 28, 0.045);
+}
+/* ---------- base ---------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 480px at 18% -8%, var(--accent-soft), transparent 62%),
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 44px);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+::selection { background: var(--accent); color: var(--accent-ink); }
+a { color: var(--accent); }
+a:hover { color: var(--ink); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+.vh {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--accent); color: var(--accent-ink);
+  padding: 8px 14px; z-index: 60; text-decoration: none;
+}
+.skip:focus { left: 12px; top: 12px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* ---------- header ---------- */
+.top { border-bottom: 1px solid var(--line-soft); background: transparent; }
+.top-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+.brand svg { flex: none; color: var(--accent); }
+.brand-name { font-weight: 700; letter-spacing: 0.02em; font-size: 14px; }
+.top-actions { display: flex; align-items: center; gap: 10px; }
+.top-link { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; color: var(--ink-2); }
+.top-link:hover { color: var(--accent); }
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line);
+  color: var(--ink); border-radius: 6px; padding: 8px 14px;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+  cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  text-decoration: none;
+}
+.btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn-primary:hover { border-color: var(--accent-dim); background: var(--accent-dim); }
+.btn-ghost { background: transparent; }
+.btn-mini { padding: 4px 9px; font-size: 11px; border-radius: 5px; }
+.btn-danger:hover { border-color: var(--fail); color: var(--fail); }
+/* ---------- hero ---------- */
+.hero { padding: 56px 0 20px; max-width: 780px; }
+.kicker {
+  font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 18px;
+}
+.kicker::before { content: "["; color: var(--ink-3); margin-right: 6px; }
+.kicker::after { content: "]"; color: var(--ink-3); margin-left: 6px; }
+h1 {
+  font-size: clamp(30px, 6vw, 52px);
+  line-height: 1.05; letter-spacing: -0.02em; font-weight: 800;
+  margin-bottom: 18px;
+}
+h1 .accent { color: var(--accent); }
+.lede { color: var(--ink-2); max-width: 640px; margin-bottom: 22px; }
+.hero-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hint { font-size: 12px; color: var(--ink-3); }
+/* ---------- sections ---------- */
+section { padding: 26px 0; }
+.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.sec-head h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.22em; color: var(--ink-2); font-weight: 700; }
+.sec-head h2::before { content: "// "; color: var(--accent); }
+.sec-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.status { min-height: 1.4em; font-size: 12px; color: var(--accent-dim); margin-bottom: 10px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 18px; box-shadow: var(--shadow);
+}
+/* ---------- run cards ---------- */
+.runs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.run-card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 16px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+}
+.run-card.is-loaded { border-color: var(--accent-dim); }
+.run-card.has-error { border-color: var(--fail); }
+.run-tag { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.run-name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-2); font-weight: 700; }
+.run-role { font-size: 11px; color: var(--ink-3); }
+.dropzone {
+  border: 1px dashed var(--line); border-radius: 8px;
+  padding: 20px 14px; text-align: center; cursor: pointer;
+  background: var(--bg-2); transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dropzone:hover, .dropzone.is-over { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone p { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+.dz-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.file-label { position: relative; }
+.vh:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.paste-area { display: flex; flex-direction: column; gap: 8px; }
+.paste-area textarea {
+  width: 100%; min-height: 110px; resize: vertical;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px; font-size: 12px; color: var(--ink);
+}
+.paste-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.run-loaded { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.run-file { font-weight: 700; word-break: break-all; }
+.run-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2); }
+.pill {
+  display: inline-block; border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 9px; font-size: 11px; color: var(--ink-2); background: var(--bg-2);
+}
+.pill-accent { border-color: var(--accent-dim); color: var(--accent); }
+.run-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.run-error { color: var(--fail); font-size: 12px; }
+.add-card {
+  border: 1px dashed var(--line); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 120px; background: transparent;
+}
+.help { margin-top: 14px; font-size: 13px; color: var(--ink-2); }
+.help summary { cursor: pointer; color: var(--ink-3); font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; }
+.help summary:hover { color: var(--accent); }
+.help ul { margin: 10px 0 0 18px; display: flex; flex-direction: column; gap: 4px; }
+.help code { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+/* ---------- mapping ---------- */
+.map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-2); font-weight: 700; }
+.tag {
+  display: inline-block; background: var(--accent-soft); color: var(--accent);
+  border: 1px solid var(--accent-dim); border-radius: 4px;
+  font-size: 10px; padding: 0 5px; margin-left: 6px; letter-spacing: 0.06em;
+}
+.field-row { display: flex; gap: 6px; }
+select, input[type="number"] {
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 10px; font-size: 13px; width: 100%; min-width: 0; color: var(--ink);
+}
+select:hover, input[type="number"]:hover { border-color: var(--accent-dim); }
+.map-note { margin-top: 14px; font-size: 12px; color: var(--ink-3); }
+/* ---------- tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.tile {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+}
+.tile::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--tile-c, var(--neutral)); }
+.tile-label { display: flex; align-items: center; gap: 7px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-2); font-weight: 700; }
+.tile-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tile-c, var(--neutral)); flex: none; }
+.tile-value { display: block; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 2px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tile-sub { display: block; font-size: 11px; color: var(--ink-3); }
+.t-fail { --tile-c: var(--fail); }
+.t-pass { --tile-c: var(--pass); }
+.t-flaky { --tile-c: var(--flaky); }
+.t-info { --tile-c: var(--info); }
+.t-neutral { --tile-c: var(--neutral); }
+/* ---------- chips ---------- */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--ink-2);
+  padding: 5px 12px; font-size: 12px; cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.chip:hover { border-color: var(--accent); color: var(--ink); }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--chip-c, var(--neutral)); flex: none; }
+.chip .n { font-weight: 700; color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--chip-soft, var(--accent-soft)); border-color: var(--chip-c, var(--accent)); color: var(--ink); }
+.c-all { --chip-c: var(--accent); --chip-soft: var(--accent-soft); }
+.c-fail { --chip-c: var(--fail); --chip-soft: var(--fail-soft); }
+.c-pass { --chip-c: var(--pass); --chip-soft: var(--pass-soft); }
+.c-flaky { --chip-c: var(--flaky); --chip-soft: var(--flaky-soft); }
+.c-info { --chip-c: var(--info); --chip-soft: var(--info-soft); }
+.c-neutral { --chip-c: var(--neutral); --chip-soft: var(--neutral-soft); }
+/* ---------- toolbar ---------- */
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.toolbar .meta { font-size: 12px; color: var(--ink-3); }
+.toolbar .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* ---------- table ---------- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; min-width: 680px; font-size: 13px; }
+thead th {
+  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--ink-3); padding: 10px 12px; border-bottom: 1px solid var(--line);
+  background: var(--panel-2); white-space: nowrap; position: sticky; top: 0;
+}
+.th-sort {
+  background: none; border: 0; cursor: pointer; color: inherit;
+  font: inherit; text-transform: inherit; letter-spacing: inherit; padding: 0;
+}
+.th-sort:hover { color: var(--accent); }
+tbody td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+tbody tr.row:hover > td { background: var(--panel-2); }
+tbody tr:last-child > td { border-bottom: 0; }
+.cell-id { font-weight: 700; word-break: break-all; max-width: 320px; }
+.cell-delta { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.d-neg { color: var(--fail); }
+.d-pos { color: var(--pass); }
+.outcome { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.o-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--neutral); }
+.o-pass .o-dot { background: var(--pass); }
+.o-fail .o-dot { background: var(--fail); }
+.badge {
+  display: inline-block; border-radius: 4px; padding: 1px 8px;
+  font-size: 11px; letter-spacing: 0.04em; white-space: nowrap;
+  border: 1px solid var(--b-c, var(--neutral)); color: var(--ink);
+  background: var(--b-soft, transparent);
+}
+.b-newfail { --b-c: var(--fail); --b-soft: var(--fail-soft); font-weight: 700; }
+.b-newpass { --b-c: var(--pass); --b-soft: var(--pass-soft); font-weight: 700; }
+.b-regressed { --b-c: var(--fail); }
+.b-improved { --b-c: var(--pass); }
+.b-flaky { --b-c: var(--flaky); --b-soft: var(--flaky-soft); }
+.b-unchanged { --b-c: var(--line); color: var(--ink-3); }
+.b-onlybase { --b-c: var(--neutral); color: var(--ink-2); }
+.b-onlycand { --b-c: var(--info); color: var(--ink-2); }
+.expander {
+  width: 26px; height: 26px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--bg-2);
+  cursor: pointer; font-weight: 700; line-height: 1; color: var(--ink-2);
+}
+.expander:hover { border-color: var(--accent); color: var(--accent); }
+.detail-row > td { background: var(--bg-2); padding: 14px; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.detail-run { border: 1px solid var(--line-soft); border-radius: 8px; background: var(--panel); overflow: hidden; min-width: 0; }
+.detail-run-h {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 11px; border-bottom: 1px solid var(--line-soft);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-2);
+}
+.detail-run pre {
+  margin: 0; padding: 11px; font-size: 12px; line-height: 1.5;
+  max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  color: var(--ink-2);
+}
+.detail-absent { padding: 14px 11px; font-size: 12px; color: var(--ink-3); font-style: italic; }
+.truncated-note { padding: 12px; font-size: 12px; color: var(--ink-3); text-align: center; }
+/* ---------- empty state ---------- */
+.empty {
+  border: 1px dashed var(--line); border-radius: 10px;
+  padding: 44px 20px; text-align: center; color: var(--ink-3);
+  display: flex; flex-direction: column; gap: 12px; align-items: center;
+}
+.empty strong { color: var(--ink-2); font-size: 15px; }
+.empty p { font-size: 13px; max-width: 460px; }
+/* ---------- footer ---------- */
+footer { border-top: 1px solid var(--line-soft); margin-top: 44px; }
+.foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 22px 0; font-size: 12px; color: var(--ink-3); }
+.foot-inner a { color: var(--ink-2); text-decoration: none; }
+.foot-inner a:hover { color: var(--accent); }
+/* ---------- motion ---------- */
+.rise { animation: rise 0.5s ease both; }
+.rise:nth-of-type(2) { animation-delay: 0.06s; }
+.rise:nth-of-type(3) { animation-delay: 0.12s; }
+.rise:nth-of-type(4) { animation-delay: 0.18s; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+/* ---------- responsive ---------- */
+@media (max-width: 720px) {
+  .hero { padding-top: 36px; }
+  section { padding: 20px 0; }
+  .tile-value { font-size: 24px; }
+}
+@media (max-width: 420px) {
+  .wrap { padding: 0 14px; }
+  .runs { grid-template-columns: 1fr; }
+  .brand-name { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <div class="wrap top-inner">
+    <a class="brand" href="#main">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" stroke-width="2"></rect>
+        <rect x="8" y="8" width="14" height="14" rx="2" stroke="currentColor" stroke-width="2"></rect>
+      </svg>
+      <span class="brand-name">eval-regression-viewer</span>
+    </a>
+    <nav class="top-actions" aria-label="Site">
+      <a class="top-link" href="https://github.com/0xelitesystem/eval-regression-viewer">GitHub</a>
+      <button id="theme-toggle" class="btn btn-ghost btn-mini" type="button" aria-pressed="false">Light mode</button>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <section class="hero rise">
+    <p class="kicker">Eval diff / 100% local</p>
+    <h1>You ran your evals twice.<br><span class="accent">Now what?</span></h1>
+    <p class="lede">Drop a baseline run and a candidate run (JSONL, JSON array, or CSV). Get a case-by-case answer: which cases broke, which recovered, which scores moved, and which are just flaky. Files are parsed in your browser and never uploaded.</p>
+    <div class="hero-actions">
+      <button class="btn btn-primary" data-action="load-sample" type="button">Load demo runs</button>
+      <span class="hint">3 embedded runs: baseline, candidate, and a rerun for flake detection.</span>
+    </div>
+  </section>
+
+  <section class="rise" aria-labelledby="runs-h">
+    <div class="sec-head">
+      <h2 id="runs-h">1. Runs</h2>
+      <div class="sec-tools" id="run-tools"></div>
+    </div>
+    <p id="live-status" class="status" role="status" aria-live="polite"></p>
+    <div id="runs" class="runs"></div>
+    <details class="help">
+      <summary>Accepted formats</summary>
+      <ul>
+        <li><code>.jsonl</code> - one JSON object per line; blank lines are fine.</li>
+        <li><code>.json</code> - an array of objects, or an object wrapping one under <code>results</code>, <code>cases</code>, <code>records</code>, <code>rows</code>, <code>data</code>, <code>examples</code>, or <code>items</code>.</li>
+        <li><code>.csv</code> - header row required; quoted fields and commas inside quotes are handled.</li>
+        <li>Each record needs a case id (for joining) and an outcome (boolean, pass/fail string, or numeric score). The mapping in step 2 is auto-detected and can be overridden.</li>
+        <li>Duplicate case ids within one run: the last record wins.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="rise" id="mapping-sec" aria-labelledby="map-h" hidden>
+    <div class="sec-head"><h2 id="map-h">2. Field mapping</h2></div>
+    <div id="mapping" class="panel"></div>
+  </section>
+
+  <section class="rise" id="results-sec" aria-labelledby="res-h">
+    <div class="sec-head"><h2 id="res-h">3. Diff</h2></div>
+    <div id="results"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span><a href="https://elitesystem.ai">An elitesystem.ai tool</a></span>
+    <span>No external dependencies. Nothing leaves this page. <a href="https://github.com/0xelitesystem/eval-regression-viewer">Source on GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+"use strict";
+/* ===================== core (pure, no DOM) ===================== */
+
+function parseCSV(text) {
+  var rows = [];
+  var field = "";
+  var row = [];
+  var inQ = false;
+  var i = 0;
+  var c;
+  function pushField() { row.push(field); field = ""; }
+  function pushRow() { pushField(); rows.push(row); row = []; }
+  while (i < text.length) {
+    c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"') { inQ = true; i++; continue; }
+    if (c === ",") { pushField(); i++; continue; }
+    if (c === "\r") { if (text[i + 1] === "\n") i++; pushRow(); i++; continue; }
+    if (c === "\n") { pushRow(); i++; continue; }
+    field += c; i++;
+  }
+  if (field !== "" || row.length) pushRow();
+  rows = rows.filter(function (r) { return !(r.length === 1 && r[0].trim() === ""); });
+  if (!rows.length) throw new Error("CSV appears to be empty.");
+  var headers = rows[0].map(function (h) { return h.trim(); });
+  if (headers.length < 2) throw new Error("CSV needs a header row with at least two columns.");
+  var out = [];
+  for (var r = 1; r < rows.length; r++) {
+    var obj = {};
+    for (var k = 0; k < headers.length; k++) {
+      obj[headers[k] || ("col_" + (k + 1))] = rows[r][k] !== undefined ? rows[r][k] : "";
+    }
+    out.push(obj);
+  }
+  if (!out.length) throw new Error("CSV has a header row but no data rows.");
+  return out;
+}
+
+function parseJSONL(text) {
+  var lines = text.split(/\r?\n/);
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var v;
+    try { v = JSON.parse(line); }
+    catch (e) { throw new Error("Line " + (i + 1) + " is not valid JSON."); }
+    if (v && typeof v === "object" && !Array.isArray(v)) out.push(v);
+    else throw new Error("Line " + (i + 1) + " is valid JSON but not an object.");
+  }
+  if (!out.length) throw new Error("No JSON objects found.");
+  return out;
+}
+
+function recordsFromJSON(value) {
+  if (Array.isArray(value)) {
+    var objs = value.filter(function (v) { return v && typeof v === "object" && !Array.isArray(v); });
+    if (!objs.length) throw new Error("JSON array contains no objects.");
+    return objs;
+  }
+  if (value && typeof value === "object") {
+    var wrappers = ["results", "cases", "records", "rows", "data", "examples", "items"];
+    for (var i = 0; i < wrappers.length; i++) {
+      if (Array.isArray(value[wrappers[i]])) return recordsFromJSON(value[wrappers[i]]);
+    }
+    return [value];
+  }
+  throw new Error("JSON must be an array of objects.");
+}
+
+function detectAndParse(text, filename) {
+  var name = String(filename || "").toLowerCase();
+  var body = String(text || "");
+  if (!body.trim()) throw new Error("The input is empty.");
+  if (name.slice(-4) === ".csv") return { format: "csv", records: parseCSV(body) };
+  if (name.slice(-6) === ".jsonl" || name.slice(-7) === ".ndjson") return { format: "jsonl", records: parseJSONL(body) };
+  if (name.slice(-5) === ".json") {
+    try { return { format: "json", records: recordsFromJSON(JSON.parse(body.trim())) }; }
+    catch (e) { return { format: "jsonl", records: parseJSONL(body) }; }
+  }
+  var trimmed = body.trim();
+  if (trimmed[0] === "[") {
+    try { return { format: "json", records: recordsFromJSON(JSON.parse(trimmed)) }; } catch (e1) {}
+  }
+  if (trimmed[0] === "{") {
+    try { return { format: "jsonl", records: parseJSONL(body) }; } catch (e2) {}
+    try { return { format: "json", records: recordsFromJSON(JSON.parse(trimmed)) }; } catch (e3) {}
+  }
+  try { return { format: "csv", records: parseCSV(body) }; }
+  catch (e4) { throw new Error("Could not parse this as JSONL, a JSON array, or CSV. Check the contents and try again."); }
+}
+
+function collectKeys(records) {
+  var seen = {};
+  var keys = [];
+  var n = Math.min(records.length, 200);
+  for (var i = 0; i < n; i++) {
+    var rec = records[i];
+    for (var k in rec) {
+      if (Object.prototype.hasOwnProperty.call(rec, k) && !seen[k]) { seen[k] = true; keys.push(k); }
+    }
+  }
+  return keys;
+}
+
+var ID_CANDIDATES = ["id", "case_id", "test_id", "name", "question", "input"];
+var OUTCOME_CANDIDATES = ["pass", "passed", "correct", "score", "grade", "result"];
+
+function autoDetectFields(keys) {
+  var byLower = {};
+  keys.forEach(function (k) {
+    var lk = k.toLowerCase();
+    if (!(lk in byLower)) byLower[lk] = k;
+  });
+  var idField = null;
+  var outcomeField = null;
+  for (var i = 0; i < ID_CANDIDATES.length; i++) {
+    if (byLower[ID_CANDIDATES[i]]) { idField = byLower[ID_CANDIDATES[i]]; break; }
+  }
+  for (var j = 0; j < OUTCOME_CANDIDATES.length; j++) {
+    if (byLower[OUTCOME_CANDIDATES[j]]) { outcomeField = byLower[OUTCOME_CANDIDATES[j]]; break; }
+  }
+  return { idField: idField, outcomeField: outcomeField };
+}
+
+var PASS_WORDS = { pass: 1, passed: 1, "true": 1, yes: 1, y: 1, ok: 1, correct: 1, success: 1, succeeded: 1 };
+var FAIL_WORDS = { fail: 1, failed: 1, "false": 1, no: 1, n: 1, error: 1, incorrect: 1, wrong: 1, failure: 1 };
+
+function parseOutcome(v) {
+  if (v === null || v === undefined || v === "") return { kind: "missing", score: null };
+  if (typeof v === "boolean") return { kind: "bool", pass: v, score: null };
+  if (typeof v === "number") {
+    return isFinite(v) ? { kind: "score", score: v } : { kind: "unknown", raw: String(v), score: null };
+  }
+  var s = String(v).trim();
+  var ls = s.toLowerCase();
+  if (PASS_WORDS[ls] === 1) return { kind: "bool", pass: true, score: null };
+  if (FAIL_WORDS[ls] === 1) return { kind: "bool", pass: false, score: null };
+  if (ls !== "" && !isNaN(Number(ls))) return { kind: "score", score: Number(ls) };
+  return { kind: "unknown", raw: s, score: null };
+}
+
+function passStatus(outcome, threshold) {
+  if (!outcome) return null;
+  if (outcome.kind === "bool") return outcome.pass;
+  if (outcome.kind === "score") return outcome.score >= threshold;
+  return null;
+}
+
+function computeDiff(runs, opts) {
+  var idF = opts.idField;
+  var oF = opts.outcomeField;
+  var maps = runs.map(function (run) {
+    var m = new Map();
+    run.records.forEach(function (rec) {
+      var id = rec[idF];
+      if (id === undefined || id === null || String(id).trim() === "") return;
+      m.set(String(id), rec);
+    });
+    return m;
+  });
+  var A = maps[0];
+  var B = maps[1];
+  var order = [];
+  var seen = new Set();
+  A.forEach(function (_, k) { order.push(k); seen.add(k); });
+  B.forEach(function (_, k) { if (!seen.has(k)) { order.push(k); seen.add(k); } });
+  var flakyPossible = maps.length >= 3;
+  var rows = [];
+  order.forEach(function (id) {
+    var ra = A.get(id) || null;
+    var rb = B.get(id) || null;
+    var oa = ra ? parseOutcome(ra[oF]) : null;
+    var ob = rb ? parseOutcome(rb[oF]) : null;
+    var pa = ra ? passStatus(oa, opts.passThreshold) : null;
+    var pb = rb ? passStatus(ob, opts.passThreshold) : null;
+    var delta = (oa && ob && oa.kind === "score" && ob.kind === "score") ? ob.score - oa.score : null;
+    var cat;
+    if (!ra) cat = "onlycand";
+    else if (!rb) cat = "onlybase";
+    else if (pa === true && pb === false) cat = "newfail";
+    else if (pa === false && pb === true) cat = "newpass";
+    else if (delta !== null && delta < -opts.deltaThreshold) cat = "regressed";
+    else if (delta !== null && delta > opts.deltaThreshold) cat = "improved";
+    else cat = "unchanged";
+    var flaky = false;
+    var seq = [];
+    if (flakyPossible) {
+      for (var i = 0; i < maps.length; i++) {
+        var r = maps[i].get(id);
+        if (!r) { seq.push(null); continue; }
+        seq.push(passStatus(parseOutcome(r[oF]), opts.passThreshold));
+      }
+      var present = seq.filter(function (p) { return p !== null; });
+      var flips = 0;
+      for (var j = 1; j < present.length; j++) {
+        if (present[j] !== present[j - 1]) flips++;
+      }
+      flaky = flips >= 2;
+    }
+    rows.push({ id: id, cat: cat, flaky: flaky, seq: seq, a: ra, b: rb, oa: oa, ob: ob, pa: pa, pb: pb, delta: delta });
+  });
+  var counts = { newfail: 0, newpass: 0, regressed: 0, improved: 0, unchanged: 0, onlybase: 0, onlycand: 0, flaky: 0 };
+  rows.forEach(function (r) {
+    counts[r.cat]++;
+    if (r.flaky) counts.flaky++;
+  });
+  var sumA = 0, sumB = 0, scored = 0;
+  rows.forEach(function (r) {
+    if (r.delta !== null) { sumA += r.oa.score; sumB += r.ob.score; scored++; }
+  });
+  function passRate(m) {
+    var p = 0, t = 0;
+    m.forEach(function (rec) {
+      var st = passStatus(parseOutcome(rec[oF]), opts.passThreshold);
+      if (st !== null) { t++; if (st) p++; }
+    });
+    return t ? p / t : null;
+  }
+  var prA = passRate(A);
+  var prB = passRate(B);
+  return {
+    rows: rows,
+    counts: counts,
+    scoreDelta: scored ? (sumB - sumA) / scored : null,
+    scoredPairs: scored,
+    passRateDelta: (prA !== null && prB !== null) ? prB - prA : null,
+    baseCount: A.size,
+    candCount: B.size,
+    runCount: maps.length,
+    runMaps: maps
+  };
+}
+
+function csvField(v) {
+  var s = v === null || v === undefined ? "" : String(v);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function fmtNum(n) {
+  if (typeof n !== "number" || !isFinite(n)) return "-";
+  return String(Math.round(n * 1000) / 1000);
+}
+
+function fmtSigned(n, dp) {
+  var v = n.toFixed(dp);
+  if (parseFloat(v) === 0) v = (0).toFixed(dp);
+  return (parseFloat(v) > 0 ? "+" : "") + v;
+}
+
+function outcomeText(o, p) {
+  if (!o || o.kind === "missing") return "-";
+  if (o.kind === "bool") return o.pass ? "pass" : "fail";
+  if (o.kind === "score") return fmtNum(o.score) + (p === null ? "" : (p ? " (pass)" : " (fail)"));
+  return o.raw.length > 40 ? o.raw.slice(0, 37) + "..." : o.raw;
+}
+
+var CAT_META = {
+  newfail: { label: "new failure", chip: "c-fail", badge: "b-newfail", rank: 0 },
+  regressed: { label: "regressed", chip: "c-fail", badge: "b-regressed", rank: 1 },
+  onlybase: { label: "only in baseline", chip: "c-neutral", badge: "b-onlybase", rank: 2 },
+  onlycand: { label: "only in candidate", chip: "c-info", badge: "b-onlycand", rank: 3 },
+  newpass: { label: "new pass", chip: "c-pass", badge: "b-newpass", rank: 4 },
+  improved: { label: "improved", chip: "c-pass", badge: "b-improved", rank: 5 },
+  unchanged: { label: "unchanged", chip: "c-neutral", badge: "b-unchanged", rank: 6 }
+};
+
+function buildMarkdown(diff, opts, runInfos) {
+  var L = [];
+  var c = diff.counts;
+  L.push("# Eval regression report");
+  L.push("");
+  L.push("Baseline: " + runInfos[0].name + " (" + diff.baseCount + " cases)");
+  L.push("Candidate: " + runInfos[1].name + " (" + diff.candCount + " cases)");
+  for (var i = 2; i < runInfos.length; i++) {
+    L.push("Extra run: " + runInfos[i].name);
+  }
+  L.push("Settings: id field `" + opts.idField + "`, outcome field `" + opts.outcomeField + "`, pass threshold " + opts.passThreshold + ", regression delta " + opts.deltaThreshold);
+  L.push("");
+  L.push("| Metric | Value |");
+  L.push("| --- | --- |");
+  L.push("| New failures | " + c.newfail + " |");
+  L.push("| New passes | " + c.newpass + " |");
+  L.push("| Regressed (score) | " + c.regressed + " |");
+  L.push("| Improved (score) | " + c.improved + " |");
+  if (diff.scoreDelta !== null) {
+    L.push("| Net score delta (avg, " + diff.scoredPairs + " joined cases) | " + fmtSigned(diff.scoreDelta, 3) + " |");
+  } else if (diff.passRateDelta !== null) {
+    L.push("| Pass rate delta | " + fmtSigned(diff.passRateDelta * 100, 1) + " pts |");
+  }
+  L.push("| Flaky cases | " + (diff.runCount >= 3 ? c.flaky : "n/a (needs 3+ runs)") + " |");
+  L.push("| Coverage change | " + fmtSigned(diff.candCount - diff.baseCount, 0) + " (" + diff.baseCount + " to " + diff.candCount + " cases) |");
+  L.push("| Unchanged | " + c.unchanged + " |");
+  L.push("");
+  var sections = [
+    ["newfail", "New failures"],
+    ["regressed", "Regressed"],
+    ["newpass", "New passes"],
+    ["improved", "Improved"],
+    ["onlybase", "Only in baseline"],
+    ["onlycand", "Only in candidate"]
+  ];
+  sections.forEach(function (sec) {
+    var cat = sec[0];
+    var list = diff.rows.filter(function (r) { return r.cat === cat; });
+    if (!list.length) return;
+    L.push("## " + sec[1] + " (" + list.length + ")");
+    L.push("");
+    var cap = Math.min(list.length, 50);
+    for (var k = 0; k < cap; k++) {
+      var r = list[k];
+      if (cat === "onlybase") L.push("- `" + r.id + "`: " + outcomeText(r.oa, r.pa));
+      else if (cat === "onlycand") L.push("- `" + r.id + "`: " + outcomeText(r.ob, r.pb));
+      else L.push("- `" + r.id + "`: " + outcomeText(r.oa, r.pa) + " -> " + outcomeText(r.ob, r.pb));
+    }
+    if (list.length > cap) L.push("- ...and " + (list.length - cap) + " more");
+    L.push("");
+  });
+  if (diff.runCount >= 3) {
+    var flakes = diff.rows.filter(function (r) { return r.flaky; });
+    if (flakes.length) {
+      L.push("## Flaky (" + flakes.length + ")");
+      L.push("");
+      var fcap = Math.min(flakes.length, 50);
+      for (var f = 0; f < fcap; f++) {
+        var fr = flakes[f];
+        var seqTxt = fr.seq.map(function (p) { return p === null ? "absent" : (p ? "pass" : "fail"); }).join(" -> ");
+        L.push("- `" + fr.id + "`: " + seqTxt);
+      }
+      if (flakes.length > fcap) L.push("- ...and " + (flakes.length - fcap) + " more");
+      L.push("");
+    }
+  }
+  L.push("Generated locally by eval-regression-viewer: https://0xelitesystem.github.io/eval-regression-viewer/");
+  return L.join("\n");
+}
+
+function buildCSV(diff, opts) {
+  var lines = ["case_id,category,flaky,baseline_value,candidate_value,baseline_score,candidate_score,score_delta"];
+  diff.rows.forEach(function (r) {
+    var baseRaw = r.a ? r.a[opts.outcomeField] : "";
+    var candRaw = r.b ? r.b[opts.outcomeField] : "";
+    lines.push([
+      csvField(r.id),
+      csvField(CAT_META[r.cat].label),
+      csvField(r.flaky ? "yes" : "no"),
+      csvField(baseRaw === undefined ? "" : baseRaw),
+      csvField(candRaw === undefined ? "" : candRaw),
+      csvField(r.oa && r.oa.kind === "score" ? r.oa.score : ""),
+      csvField(r.ob && r.ob.kind === "score" ? r.ob.score : ""),
+      csvField(r.delta === null ? "" : Math.round(r.delta * 100000) / 100000)
+    ].join(","));
+  });
+  return lines.join("\r\n");
+}
+
+/* ===================== ui ===================== */
+
+var SAMPLE_RUNS = [
+  {
+    name: "baseline-2026-07-12.jsonl",
+    records: [
+      { id: "qa-000", input: "Convert 5 miles to kilometers", expected: "8.05 km", output: "8.0 km", score: 0.60 },
+      { id: "qa-001", input: "What is the capital of Australia?", expected: "Canberra", output: "Canberra", score: 0.92 },
+      { id: "qa-002", input: "Sum 17 + 26", expected: "43", output: "43", score: 0.88 },
+      { id: "qa-003", input: "Extract the invoice number from: INV-2291 due 6/30", expected: "INV-2291", output: "2291", score: 0.41 },
+      { id: "qa-004", input: "Who wrote The Left Hand of Darkness?", expected: "Ursula K. Le Guin", output: "Ursula K. Le Guin", score: 0.77 },
+      { id: "qa-005", input: "Is 97 prime?", expected: "yes", output: "yes", score: 0.95 },
+      { id: "qa-006", input: "Summarize the refund policy paragraph", expected: "rubric-graded", output: "Refunds within 30 days.", score: 0.63 },
+      { id: "qa-007", input: "Normalize the date in: shipped 03/04/2025", expected: "2025-03-04", output: "2025-03-04", score: 0.55 },
+      { id: "qa-008", input: "Classify sentiment: the update broke everything I liked", expected: "negative", output: "negative", score: 0.70 },
+      { id: "qa-009", input: "Translate to French: good morning", expected: "bonjour", output: "bonjour", score: 0.85 }
+    ]
+  },
+  {
+    name: "candidate-2026-07-19.jsonl",
+    records: [
+      { id: "qa-001", input: "What is the capital of Australia?", expected: "Canberra", output: "Canberra", score: 0.94 },
+      { id: "qa-002", input: "Sum 17 + 26", expected: "43", output: "43", score: 0.90 },
+      { id: "qa-003", input: "Extract the invoice number from: INV-2291 due 6/30", expected: "INV-2291", output: "INV-2291", score: 0.58 },
+      { id: "qa-004", input: "Who wrote The Left Hand of Darkness?", expected: "Ursula K. Le Guin", output: "Ursula Le Guin", score: 0.71 },
+      { id: "qa-005", input: "Is 97 prime?", expected: "yes", output: "yes", score: 0.96 },
+      { id: "qa-006", input: "Summarize the refund policy paragraph", expected: "rubric-graded", output: "Full refunds within 30 days, store credit after.", score: 0.79 },
+      { id: "qa-007", input: "Normalize the date in: shipped 03/04/2025", expected: "2025-03-04", output: "2025-04-03", score: 0.32 },
+      { id: "qa-008", input: "Classify sentiment: the update broke everything I liked", expected: "negative", output: "neutral", score: 0.44 },
+      { id: "qa-009", input: "Translate to French: good morning", expected: "bonjour", output: "bon matin", score: 0.72 },
+      { id: "qa-010", input: "Extract the total from: amount due USD 149.00", expected: "149.00", output: "149.00", score: 0.81 }
+    ]
+  },
+  {
+    name: "candidate-rerun-2026-07-19.jsonl",
+    records: [
+      { id: "qa-001", input: "What is the capital of Australia?", expected: "Canberra", output: "Canberra", score: 0.93 },
+      { id: "qa-002", input: "Sum 17 + 26", expected: "43", output: "43", score: 0.89 },
+      { id: "qa-003", input: "Extract the invoice number from: INV-2291 due 6/30", expected: "INV-2291", output: "INV-2291", score: 0.60 },
+      { id: "qa-004", input: "Who wrote The Left Hand of Darkness?", expected: "Ursula K. Le Guin", output: "Ursula Le Guin", score: 0.70 },
+      { id: "qa-005", input: "Is 97 prime?", expected: "yes", output: "yes", score: 0.95 },
+      { id: "qa-006", input: "Summarize the refund policy paragraph", expected: "rubric-graded", output: "Full refunds within 30 days.", score: 0.80 },
+      { id: "qa-007", input: "Normalize the date in: shipped 03/04/2025", expected: "2025-03-04", output: "2025-04-03", score: 0.30 },
+      { id: "qa-008", input: "Classify sentiment: the update broke everything I liked", expected: "negative", output: "negative", score: 0.83 },
+      { id: "qa-009", input: "Translate to French: good morning", expected: "bonjour", output: "bonjour matin", score: 0.73 },
+      { id: "qa-010", input: "Extract the total from: amount due USD 149.00", expected: "149.00", output: "149.00", score: 0.82 }
+    ]
+  }
+];
+
+var MAX_RUNS = 6;
+
+var state = {
+  slots: [makeSlot(), makeSlot()],
+  keys: [],
+  idField: null,
+  outcomeField: null,
+  idAuto: true,
+  outAuto: true,
+  passThreshold: 0.5,
+  deltaThreshold: 0.05,
+  filter: "all",
+  sortKey: "severity",
+  sortDir: 1,
+  expanded: {},
+  diff: null
+};
+
+function makeSlot() { return { run: null, error: null, pasteOpen: false }; }
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (ch) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+  });
+}
+
+function slotLabel(i) {
+  var letter = String.fromCharCode(65 + i);
+  if (i === 0) return "Run " + letter + " - baseline";
+  if (i === 1) return "Run " + letter + " - candidate";
+  return "Run " + letter + " - extra";
+}
+
+function loadedSlots() {
+  return state.slots.filter(function (s) { return s.run; });
+}
+
+function setStatus(msg) {
+  var el = document.getElementById("live-status");
+  if (el) el.textContent = msg;
+}
+
+function loadTextIntoSlot(i, text, name) {
+  var slot = state.slots[i];
+  if (!slot) return;
+  slot.error = null;
+  slot.pasteOpen = false;
+  try {
+    var parsed = detectAndParse(text, name);
+    slot.run = {
+      name: name || "pasted-run",
+      format: parsed.format,
+      records: parsed.records,
+      keys: collectKeys(parsed.records)
+    };
+    setStatus("Loaded " + parsed.records.length + " records from " + slot.run.name + " (" + parsed.format.toUpperCase() + ") into " + slotLabel(i) + ".");
+  } catch (err) {
+    slot.run = null;
+    slot.error = err && err.message ? err.message : "Could not parse that input.";
+    setStatus("Problem loading into " + slotLabel(i) + ": " + slot.error);
+  }
+  refreshFields();
+  compute();
+  renderAll();
+}
+
+function refreshFields() {
+  var loaded = loadedSlots();
+  var union = [];
+  var seen = {};
+  loaded.forEach(function (s) {
+    s.run.keys.forEach(function (k) {
+      if (!seen[k]) { seen[k] = true; union.push(k); }
+    });
+  });
+  state.keys = union;
+  if (!union.length) { state.idField = null; state.outcomeField = null; return; }
+  var auto = autoDetectFields(union);
+  if (state.idAuto || (state.idField && union.indexOf(state.idField) === -1)) {
+    state.idField = auto.idField || union[0];
+    state.idAuto = true;
+  }
+  if (state.outAuto || (state.outcomeField && union.indexOf(state.outcomeField) === -1)) {
+    state.outcomeField = auto.outcomeField || guessOutcomeField(union, loaded);
+    state.outAuto = true;
+  }
+}
+
+function guessOutcomeField(keys, loaded) {
+  if (!loaded.length) return null;
+  var sample = loaded[0].run.records.slice(0, 20);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (k === state.idField) continue;
+    var good = 0, total = 0;
+    for (var j = 0; j < sample.length; j++) {
+      if (!(k in sample[j])) continue;
+      total++;
+      var kind = parseOutcome(sample[j][k]).kind;
+      if (kind === "bool" || kind === "score") good++;
+    }
+    if (total > 0 && good === total) return k;
+  }
+  return null;
+}
+
+function compute() {
+  var loaded = loadedSlots();
+  if (loaded.length >= 2 && state.idField && state.outcomeField) {
+    state.diff = computeDiff(
+      loaded.map(function (s) { return { records: s.run.records }; }),
+      {
+        idField: state.idField,
+        outcomeField: state.outcomeField,
+        passThreshold: state.passThreshold,
+        deltaThreshold: state.deltaThreshold
+      }
+    );
+  } else {
+    state.diff = null;
+  }
+}
+
+/* ---------- render: runs ---------- */
+
+function renderRunTools() {
+  var el = document.getElementById("run-tools");
+  if (!el) return;
+  var h = [];
+  var bothLoaded = state.slots[0].run && state.slots[1].run;
+  h.push('<button class="btn btn-mini" type="button" data-action="swap-runs"' + (bothLoaded ? "" : " disabled") + ">Swap A / B</button>");
+  if (state.slots.length < MAX_RUNS) {
+    h.push('<button class="btn btn-mini" type="button" data-action="add-run">+ Add run (flake detection)</button>');
+  }
+  el.innerHTML = h.join("");
+}
+
+function renderRuns() {
+  renderRunTools();
+  var el = document.getElementById("runs");
+  if (!el) return;
+  var h = [];
+  state.slots.forEach(function (slot, i) {
+    var cls = "run-card" + (slot.run ? " is-loaded" : "") + (slot.error ? " has-error" : "");
+    h.push('<div class="' + cls + '">');
+    h.push('<div class="run-tag"><span class="run-name">' + esc(slotLabel(i)) + "</span>");
+    if (i >= 2) h.push('<button class="btn btn-mini btn-ghost btn-danger" type="button" data-action="remove-slot" data-slot="' + i + '">Remove</button>');
+    else h.push('<span class="run-role">' + (i === 0 ? "the reference" : "the change under test") + "</span>");
+    h.push("</div>");
+    if (slot.run) {
+      h.push('<div class="run-loaded">');
+      h.push('<span class="run-file">' + esc(slot.run.name) + "</span>");
+      h.push('<div class="run-meta"><span class="pill pill-accent">' + esc(slot.run.format.toUpperCase()) + '</span><span class="pill">' + slot.run.records.length + ' records</span><span class="pill">' + slot.run.keys.length + " fields</span></div>");
+      h.push('<div class="run-actions">');
+      h.push('<input class="vh" type="file" id="file-' + i + '" data-slot="' + i + '" accept=".jsonl,.json,.csv,.ndjson,.txt">');
+      h.push('<label class="btn btn-mini" for="file-' + i + '">Replace</label>');
+      h.push('<button class="btn btn-mini btn-ghost" type="button" data-action="clear-slot" data-slot="' + i + '">Clear</button>');
+      h.push("</div></div>");
+    } else if (slot.pasteOpen) {
+      h.push('<div class="paste-area">');
+      h.push('<label class="vh" for="paste-' + i + '">Paste run data for ' + esc(slotLabel(i)) + "</label>");
+      h.push('<textarea id="paste-' + i + '" placeholder="Paste JSONL, a JSON array, or CSV here"></textarea>');
+      h.push('<div class="paste-row">');
+      h.push('<button class="btn btn-mini btn-primary" type="button" data-action="parse-paste" data-slot="' + i + '">Parse pasted text</button>');
+      h.push('<button class="btn btn-mini btn-ghost" type="button" data-action="cancel-paste" data-slot="' + i + '">Cancel</button>');
+      h.push("</div></div>");
+    } else {
+      h.push('<div class="dropzone" data-slot="' + i + '">');
+      h.push('<div class="dz-actions">');
+      h.push('<input class="vh" type="file" id="file-' + i + '" data-slot="' + i + '" accept=".jsonl,.json,.csv,.ndjson,.txt">');
+      h.push('<label class="btn btn-mini" for="file-' + i + '">Choose file</label>');
+      h.push('<button class="btn btn-mini btn-ghost" type="button" data-action="toggle-paste" data-slot="' + i + '">Paste text</button>');
+      h.push("</div>");
+      h.push("<p>or drag a .jsonl / .json / .csv file here</p>");
+      h.push("</div>");
+    }
+    if (slot.error) h.push('<p class="run-error">' + esc(slot.error) + "</p>");
+    h.push("</div>");
+  });
+  el.innerHTML = h.join("");
+}
+
+/* ---------- render: mapping ---------- */
+
+function renderMapping() {
+  var sec = document.getElementById("mapping-sec");
+  var el = document.getElementById("mapping");
+  if (!sec || !el) return;
+  var loaded = loadedSlots();
+  if (!loaded.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  function options(selected) {
+    return state.keys.map(function (k) {
+      return '<option value="' + esc(k) + '"' + (k === selected ? " selected" : "") + ">" + esc(k) + "</option>";
+    }).join("");
+  }
+  var kindLine = outcomeKindLine(loaded);
+  var h = [];
+  h.push('<div class="map-grid">');
+  h.push('<div class="field"><label for="id-field">Case id field' + (state.idAuto ? '<span class="tag">auto</span>' : "") + "</label>");
+  h.push('<div class="field-row"><select id="id-field">' + options(state.idField) + "</select>");
+  h.push('<button class="btn btn-mini btn-ghost" type="button" data-action="auto-id" title="Re-detect the id field">Auto</button></div>');
+  h.push('<p class="hint">records are joined across runs on this field</p></div>');
+  h.push('<div class="field"><label for="outcome-field">Outcome field' + (state.outAuto ? '<span class="tag">auto</span>' : "") + "</label>");
+  h.push('<div class="field-row"><select id="outcome-field">' + options(state.outcomeField) + "</select>");
+  h.push('<button class="btn btn-mini btn-ghost" type="button" data-action="auto-outcome" title="Re-detect the outcome field">Auto</button></div>');
+  h.push('<p class="hint">' + esc(kindLine) + "</p></div>");
+  h.push('<div class="field"><label for="pass-thr">Pass threshold</label>');
+  h.push('<input type="number" id="pass-thr" step="0.05" value="' + state.passThreshold + '">');
+  h.push('<p class="hint">numeric score at or above this counts as pass</p></div>');
+  h.push('<div class="field"><label for="delta-thr">Regression delta</label>');
+  h.push('<input type="number" id="delta-thr" step="0.01" min="0" value="' + state.deltaThreshold + '">');
+  h.push('<p class="hint">score moves beyond this mark regressed / improved</p></div>');
+  h.push("</div>");
+  h.push('<p class="map-note">Booleans and pass/fail-style strings are read as pass/fail. Numbers are read as scores and compared against the pass threshold. Duplicate case ids within one run: last record wins.</p>');
+  el.innerHTML = h.join("");
+}
+
+function outcomeKindLine(loaded) {
+  if (!state.outcomeField) return "no outcome field selected yet";
+  var bools = 0, scores = 0, other = 0;
+  var sample = loaded[0].run.records.slice(0, 200);
+  sample.forEach(function (rec) {
+    var kind = parseOutcome(rec[state.outcomeField]).kind;
+    if (kind === "bool") bools++;
+    else if (kind === "score") scores++;
+    else other++;
+  });
+  if (scores && !bools) return "detected: numeric scores";
+  if (bools && !scores) return "detected: pass/fail values";
+  if (bools && scores) return "detected: mixed pass/fail and scores";
+  return "warning: values here do not look like outcomes";
+}
+
+/* ---------- render: results ---------- */
+
+function catRank(r) {
+  return CAT_META[r.cat].rank;
+}
+
+function sortedFilteredRows() {
+  var rows = state.diff.rows;
+  if (state.filter === "flaky") rows = rows.filter(function (r) { return r.flaky; });
+  else if (state.filter !== "all") rows = rows.filter(function (r) { return r.cat === state.filter; });
+  var sorted = rows.slice();
+  if (state.sortKey === "id") {
+    sorted.sort(function (x, y) { return x.id.localeCompare(y.id, undefined, { numeric: true }) * state.sortDir; });
+  } else if (state.sortKey === "delta") {
+    sorted.sort(function (x, y) {
+      if (x.delta === null && y.delta === null) return 0;
+      if (x.delta === null) return 1;
+      if (y.delta === null) return -1;
+      return (x.delta - y.delta) * state.sortDir;
+    });
+  } else {
+    sorted.sort(function (x, y) {
+      var d = catRank(x) - catRank(y);
+      if (d) return d;
+      return x.id.localeCompare(y.id, undefined, { numeric: true });
+    });
+  }
+  return sorted;
+}
+
+function outcomeCell(o, p) {
+  var cls = "outcome" + (p === true ? " o-pass" : p === false ? " o-fail" : "");
+  return '<span class="' + cls + '"><span class="o-dot"></span>' + esc(outcomeText(o, p)) + "</span>";
+}
+
+function renderResults() {
+  var el = document.getElementById("results");
+  if (!el) return;
+  var loaded = loadedSlots();
+  if (!state.diff) {
+    var msg, sub;
+    if (!loaded.length) {
+      msg = "Nothing loaded yet.";
+      sub = "Drop a baseline run and a candidate run in step 1, or load the demo runs to see a full diff in one click.";
+    } else if (loaded.length < 2) {
+      msg = "One more run needed.";
+      sub = "You have a baseline (" + loaded[0].run.name + "). Load a candidate run to diff against it.";
+    } else {
+      msg = "Pick an outcome field.";
+      sub = "Two runs are loaded, but no outcome field is selected in step 2, so there is nothing to compare yet.";
+    }
+    el.innerHTML = '<div class="empty"><strong>' + esc(msg) + "</strong><p>" + esc(sub) + '</p><button class="btn btn-primary" type="button" data-action="load-sample">Load demo runs</button></div>';
+    return;
+  }
+  var d = state.diff;
+  var c = d.counts;
+  var h = [];
+
+  /* tiles */
+  h.push('<div class="tiles">');
+  h.push(tile("t-fail", "New failures", String(c.newfail), "pass in baseline, fail in candidate"));
+  h.push(tile("t-pass", "New passes", String(c.newpass), "fail in baseline, pass in candidate"));
+  if (d.scoreDelta !== null) {
+    h.push(tile("t-neutral", "Net score delta", fmtSigned(d.scoreDelta, 3), "avg over " + d.scoredPairs + " joined scored cases"));
+  } else if (d.passRateDelta !== null) {
+    h.push(tile("t-neutral", "Pass rate delta", fmtSigned(d.passRateDelta * 100, 1), "percentage points, candidate vs baseline"));
+  } else {
+    h.push(tile("t-neutral", "Net score delta", "-", "no numeric scores detected"));
+  }
+  if (d.runCount >= 3) {
+    h.push(tile("t-flaky", "Flaky cases", String(c.flaky), "outcome flips across " + d.runCount + " runs"));
+  } else {
+    h.push(tile("t-flaky", "Flaky cases", "-", "add a 3rd run to detect flakes"));
+  }
+  h.push(tile("t-info", "Coverage change", fmtSigned(d.candCount - d.baseCount, 0), d.baseCount + " to " + d.candCount + " cases"));
+  h.push("</div>");
+
+  /* chips */
+  var chips = [
+    { key: "all", label: "all", cls: "c-all", n: d.rows.length },
+    { key: "newfail", label: "new failures", cls: "c-fail", n: c.newfail },
+    { key: "regressed", label: "regressed", cls: "c-fail", n: c.regressed },
+    { key: "newpass", label: "new passes", cls: "c-pass", n: c.newpass },
+    { key: "improved", label: "improved", cls: "c-pass", n: c.improved },
+    { key: "flaky", label: "flaky", cls: "c-flaky", n: c.flaky },
+    { key: "unchanged", label: "unchanged", cls: "c-neutral", n: c.unchanged },
+    { key: "onlybase", label: "only in baseline", cls: "c-neutral", n: c.onlybase },
+    { key: "onlycand", label: "only in candidate", cls: "c-info", n: c.onlycand }
+  ];
+  h.push('<div class="chips" role="group" aria-label="Filter results by category">');
+  chips.forEach(function (ch) {
+    h.push('<button class="chip ' + ch.cls + '" type="button" data-action="set-filter" data-filter="' + ch.key + '" aria-pressed="' + (state.filter === ch.key) + '"><span class="dot"></span>' + esc(ch.label) + ' <span class="n">' + ch.n + "</span></button>");
+  });
+  h.push("</div>");
+
+  /* toolbar */
+  var rows = sortedFilteredRows();
+  h.push('<div class="toolbar">');
+  h.push('<span class="meta">' + rows.length + " of " + d.rows.length + " cases shown. Click a row to see the raw records.</span>");
+  h.push('<div class="actions">');
+  h.push('<button class="btn btn-mini" type="button" data-action="copy-md">Copy markdown report</button>');
+  h.push('<button class="btn btn-mini" type="button" data-action="download-csv">Download diff CSV</button>');
+  h.push("</div></div>");
+
+  /* table */
+  if (!rows.length) {
+    h.push('<div class="empty"><strong>No cases in this category.</strong><p>Try another filter chip above.</p></div>');
+  } else {
+    var cap = 400;
+    var shown = rows.slice(0, cap);
+    h.push('<div class="table-scroll"><table>');
+    h.push("<thead><tr>");
+    h.push('<th scope="col"><span class="vh">Expand</span></th>');
+    h.push('<th scope="col" aria-sort="' + ariaSort("id") + '"><button class="th-sort" type="button" data-action="sort" data-key="id">Case id' + sortMark("id") + "</button></th>");
+    h.push('<th scope="col">Category</th>');
+    h.push('<th scope="col">Baseline</th>');
+    h.push('<th scope="col">Candidate</th>');
+    h.push('<th scope="col" aria-sort="' + ariaSort("delta") + '"><button class="th-sort" type="button" data-action="sort" data-key="delta">Delta' + sortMark("delta") + "</button></th>");
+    h.push("</tr></thead><tbody>");
+    shown.forEach(function (r) {
+      var open = !!state.expanded[r.id];
+      var deltaCls = r.delta === null ? "" : r.delta < 0 ? " d-neg" : r.delta > 0 ? " d-pos" : "";
+      h.push('<tr class="row">');
+      h.push('<td><button class="expander" type="button" data-action="toggle-row" data-id="' + esc(r.id) + '" aria-expanded="' + open + '" aria-label="Show raw records for case ' + esc(r.id) + '">' + (open ? "-" : "+") + "</button></td>");
+      h.push('<td class="cell-id">' + esc(r.id) + "</td>");
+      h.push("<td><span class=\"badge " + CAT_META[r.cat].badge + '">' + CAT_META[r.cat].label + "</span>" + (r.flaky ? ' <span class="badge b-flaky">flaky</span>' : "") + "</td>");
+      h.push("<td>" + (r.a ? outcomeCell(r.oa, r.pa) : '<span class="hint">absent</span>') + "</td>");
+      h.push("<td>" + (r.b ? outcomeCell(r.ob, r.pb) : '<span class="hint">absent</span>') + "</td>");
+      h.push('<td class="cell-delta' + deltaCls + '">' + (r.delta === null ? "-" : fmtSigned(r.delta, 3)) + "</td>");
+      h.push("</tr>");
+      if (open) h.push(detailRow(r));
+    });
+    h.push("</tbody></table>");
+    if (rows.length > cap) {
+      h.push('<p class="truncated-note">Showing the first ' + cap + " of " + rows.length + " rows. Use the filter chips to narrow down.</p>");
+    }
+    h.push("</div>");
+  }
+  el.innerHTML = h.join("");
+}
+
+function tile(cls, label, value, sub) {
+  return '<div class="tile ' + cls + '"><span class="tile-label"><span class="tile-dot"></span>' + esc(label) + '</span><span class="tile-value">' + esc(value) + '</span><span class="tile-sub">' + esc(sub) + "</span></div>";
+}
+
+function ariaSort(key) {
+  if (state.sortKey !== key) return "none";
+  return state.sortDir === 1 ? "ascending" : "descending";
+}
+
+function sortMark(key) {
+  if (state.sortKey !== key) return "";
+  return state.sortDir === 1 ? " ^" : " v";
+}
+
+function detailRow(r) {
+  var h = ['<tr class="detail-row"><td colspan="6"><div class="detail-grid">'];
+  var li = 0;
+  state.slots.forEach(function (slot, i) {
+    if (!slot.run) return;
+    var rec = state.diff.runMaps[li] ? state.diff.runMaps[li].get(r.id) : null;
+    li++;
+    var p = rec ? passStatus(parseOutcome(rec[state.outcomeField]), state.passThreshold) : null;
+    var stat = rec === null || rec === undefined ? "" : (p === true ? "pass" : p === false ? "fail" : "");
+    h.push('<div class="detail-run"><div class="detail-run-h"><span>' + esc(slotLabel(i)) + "</span>" + (stat ? '<span class="outcome ' + (p ? "o-pass" : "o-fail") + '"><span class="o-dot"></span>' + stat + "</span>" : "") + "</div>");
+    if (rec) h.push("<pre>" + esc(JSON.stringify(rec, null, 2)) + "</pre>");
+    else h.push('<div class="detail-absent">not present in this run</div>');
+    h.push("</div>");
+  });
+  h.push("</div></td></tr>");
+  return h.join("");
+}
+
+function renderAll() {
+  renderRuns();
+  renderMapping();
+  renderResults();
+}
+
+/* ---------- actions ---------- */
+
+function readFileIntoSlot(i, file) {
+  var reader = new FileReader();
+  reader.onload = function () { loadTextIntoSlot(i, String(reader.result), file.name); };
+  reader.onerror = function () {
+    state.slots[i].error = "Could not read that file.";
+    renderAll();
+  };
+  reader.readAsText(file);
+}
+
+function nextFreeSlot(used) {
+  for (var i = 0; i < state.slots.length; i++) {
+    if (!used[i] && !state.slots[i].run) return i;
+  }
+  if (state.slots.length < MAX_RUNS) {
+    state.slots.push(makeSlot());
+    return state.slots.length - 1;
+  }
+  return -1;
+}
+
+function handleDroppedFiles(slotIndex, files) {
+  /* FileReader is async, so track claimed slots synchronously */
+  var used = {};
+  var target = slotIndex;
+  for (var f = 0; f < files.length; f++) {
+    if (target === -1) {
+      setStatus("Run limit reached (" + MAX_RUNS + "). Some dropped files were skipped.");
+      break;
+    }
+    used[target] = true;
+    readFileIntoSlot(target, files[f]);
+    target = nextFreeSlot(used);
+  }
+}
+
+function loadSample() {
+  while (state.slots.length < 3) state.slots.push(makeSlot());
+  SAMPLE_RUNS.forEach(function (sample, i) {
+    state.slots[i].error = null;
+    state.slots[i].pasteOpen = false;
+    state.slots[i].run = {
+      name: sample.name,
+      format: "jsonl",
+      records: sample.records,
+      keys: collectKeys(sample.records)
+    };
+  });
+  state.idAuto = true;
+  state.outAuto = true;
+  state.expanded = {};
+  state.filter = "all";
+  refreshFields();
+  compute();
+  renderAll();
+  setStatus("Loaded 3 demo runs. The diff below includes new failures, score regressions, and one flaky case.");
+  var res = document.getElementById("results-sec");
+  if (res && res.scrollIntoView) res.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function copyText(text, btn) {
+  function flash(label) {
+    if (!btn) return;
+    var prev = btn.textContent;
+    btn.textContent = label;
+    setTimeout(function () { btn.textContent = prev; }, 1500);
+  }
+  function fallback() {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      flash(ok ? "Copied" : "Copy failed");
+    } catch (e) {
+      flash("Copy failed");
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { flash("Copied"); }, fallback);
+  } else {
+    fallback();
+  }
+}
+
+function downloadCSV() {
+  if (!state.diff) return;
+  var csv = buildCSV(state.diff, { outcomeField: state.outcomeField });
+  var blob = new Blob([csv], { type: "text/csv" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "eval-regression-diff.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+  setStatus("Downloaded eval-regression-diff.csv (" + state.diff.rows.length + " cases).");
+}
+
+function runInfos() {
+  var infos = [];
+  state.slots.forEach(function (s) {
+    if (s.run) infos.push({ name: s.run.name });
+  });
+  return infos;
+}
+
+/* ---------- events ---------- */
+
+document.addEventListener("click", function (e) {
+  if (!e.target || typeof e.target.closest !== "function") return;
+  var t = e.target.closest("[data-action]");
+  if (!t) {
+    var zone = e.target.closest(".dropzone");
+    if (zone && !e.target.closest("label, input, button, textarea")) {
+      var inp = document.getElementById("file-" + zone.getAttribute("data-slot"));
+      if (inp) inp.click();
+    }
+    return;
+  }
+  var action = t.getAttribute("data-action");
+  var slotIdx = parseInt(t.getAttribute("data-slot") || "-1", 10);
+  if (action === "load-sample") { loadSample(); return; }
+  if (action === "toggle-paste") { state.slots[slotIdx].pasteOpen = true; state.slots[slotIdx].error = null; renderRuns(); var ta0 = document.getElementById("paste-" + slotIdx); if (ta0) ta0.focus(); return; }
+  if (action === "cancel-paste") { state.slots[slotIdx].pasteOpen = false; renderRuns(); return; }
+  if (action === "parse-paste") {
+    var ta = document.getElementById("paste-" + slotIdx);
+    loadTextIntoSlot(slotIdx, ta ? ta.value : "", "pasted-run-" + String.fromCharCode(65 + slotIdx).toLowerCase() + ".txt");
+    return;
+  }
+  if (action === "clear-slot") {
+    state.slots[slotIdx] = makeSlot();
+    refreshFields(); compute(); renderAll();
+    setStatus("Cleared " + slotLabel(slotIdx) + ".");
+    return;
+  }
+  if (action === "remove-slot") {
+    state.slots.splice(slotIdx, 1);
+    refreshFields(); compute(); renderAll();
+    setStatus("Removed a run slot.");
+    return;
+  }
+  if (action === "add-run") {
+    if (state.slots.length < MAX_RUNS) { state.slots.push(makeSlot()); renderAll(); }
+    return;
+  }
+  if (action === "swap-runs") {
+    var tmp = state.slots[0];
+    state.slots[0] = state.slots[1];
+    state.slots[1] = tmp;
+    compute(); renderAll();
+    setStatus("Swapped baseline and candidate.");
+    return;
+  }
+  if (action === "auto-id") { state.idAuto = true; refreshFields(); compute(); renderMapping(); renderResults(); return; }
+  if (action === "auto-outcome") { state.outAuto = true; refreshFields(); compute(); renderMapping(); renderResults(); return; }
+  if (action === "set-filter") { state.filter = t.getAttribute("data-filter"); renderResults(); return; }
+  if (action === "sort") {
+    var key = t.getAttribute("data-key");
+    if (state.sortKey === key) state.sortDir = -state.sortDir;
+    else { state.sortKey = key; state.sortDir = 1; }
+    renderResults();
+    return;
+  }
+  if (action === "toggle-row") {
+    var id = t.getAttribute("data-id");
+    if (state.expanded[id]) delete state.expanded[id];
+    else state.expanded[id] = true;
+    renderResults();
+    return;
+  }
+  if (action === "copy-md") {
+    if (state.diff) {
+      copyText(buildMarkdown(state.diff, {
+        idField: state.idField,
+        outcomeField: state.outcomeField,
+        passThreshold: state.passThreshold,
+        deltaThreshold: state.deltaThreshold
+      }, runInfos()), t);
+    }
+    return;
+  }
+  if (action === "download-csv") { downloadCSV(); return; }
+});
+
+document.addEventListener("change", function (e) {
+  var t = e.target;
+  if (t && t.type === "file" && t.hasAttribute("data-slot")) {
+    var i = parseInt(t.getAttribute("data-slot"), 10);
+    if (t.files && t.files.length) readFileIntoSlot(i, t.files[0]);
+    return;
+  }
+  if (t && t.id === "id-field") {
+    state.idField = t.value; state.idAuto = false;
+    compute(); renderMapping(); renderResults();
+    return;
+  }
+  if (t && t.id === "outcome-field") {
+    state.outcomeField = t.value; state.outAuto = false;
+    compute(); renderMapping(); renderResults();
+    return;
+  }
+});
+
+document.addEventListener("input", function (e) {
+  var t = e.target;
+  if (t && t.id === "pass-thr") {
+    var v = parseFloat(t.value);
+    if (!isNaN(v)) { state.passThreshold = v; compute(); renderResults(); }
+    return;
+  }
+  if (t && t.id === "delta-thr") {
+    var v2 = parseFloat(t.value);
+    if (!isNaN(v2) && v2 >= 0) { state.deltaThreshold = v2; compute(); renderResults(); }
+  }
+});
+
+document.addEventListener("dragover", function (e) { e.preventDefault(); });
+document.addEventListener("drop", function (e) { e.preventDefault(); });
+
+(function wireDropzones() {
+  var runsEl = document.getElementById("runs");
+  if (!runsEl) return;
+  function zoneOf(e) {
+    return e.target && typeof e.target.closest === "function" ? e.target.closest(".dropzone") : null;
+  }
+  runsEl.addEventListener("dragover", function (e) {
+    var zone = zoneOf(e);
+    if (zone) { e.preventDefault(); zone.classList.add("is-over"); }
+  });
+  runsEl.addEventListener("dragleave", function (e) {
+    var zone = zoneOf(e);
+    if (zone) zone.classList.remove("is-over");
+  });
+  runsEl.addEventListener("drop", function (e) {
+    var zone = zoneOf(e);
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.remove("is-over");
+    var i = parseInt(zone.getAttribute("data-slot"), 10);
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      handleDroppedFiles(i, Array.prototype.slice.call(e.dataTransfer.files));
+    }
+  });
+})();
+
+/* ---------- theme ---------- */
+
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  try { localStorage.setItem("erv-theme", t); } catch (e) {}
+  var btn = document.getElementById("theme-toggle");
+  if (btn) {
+    btn.textContent = t === "dark" ? "Light mode" : "Dark mode";
+    btn.setAttribute("aria-pressed", String(t === "light"));
+  }
+}
+
+(function initTheme() {
+  var current = document.documentElement.getAttribute("data-theme") || "dark";
+  applyTheme(current);
+  var btn = document.getElementById("theme-toggle");
+  if (btn) {
+    btn.addEventListener("click", function () {
+      var now = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      applyTheme(now);
+    });
+  }
+})();
+
+renderAll();
+</script>
+</body>
+</html>
