@@ -32,6 +32,10 @@ This tool is the missing "read the results" step for the eval repos in the same 
 
 Everything runs in your browser. Files are read locally with the FileReader API and never uploaded; there are no analytics, no network requests, and no external dependencies. The only thing stored is your theme preference, in localStorage.
 
+## More
+
+Part of a catalog of single-file browser tools and plain-language references, all MIT licensed and dependency-free: [0xelitesystem.github.io](https://0xelitesystem.github.io/). Built by [elitesystem.ai](https://elitesystem.ai).
+
 ## License
 
 MIT
