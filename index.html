@@ -376,6 +376,49 @@ footer { border-top: 1px solid var(--line-soft); margin-top: 44px; }
   .brand-name { font-size: 12px; }
 }
 </style>
+<style>
+/* elitesystem brand tokens: chrome only, meaning preserved */
+:root, :root[data-theme="dark"] {
+  --accent: #d4ff3a;
+  --accent-dim: #ffb454;
+  --accent-ink: #0a0a0a;
+  --accent-soft: rgba(212,255,58,0.12);
+  --bg: #0a0a0a;
+  --bg-2: #050505;
+  --fail: #ff6450;
+  --grid-line: #1f1f1d;
+  --info: #6fd3e0;
+  --ink: #e8e8e3;
+  --ink-2: #a8a8a3;
+  --ink-3: #6e6e68;
+  --line: #1f1f1d;
+  --line-soft: #1f1f1d;
+  --panel: #111110;
+  --panel-2: #161614;
+  --pass: #7ddc7d;
+}
+:root[data-theme="light"] {
+  --accent: #2d6b00;
+  --accent-dim: #a05a00;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(45,107,0,0.08);
+  --bg: #e8ebef;
+  --bg-2: #f4f5f8;
+  --fail: #b8341a;
+  --grid-line: #c8cdd5;
+  --info: #0f5c60;
+  --ink: #0a0a0a;
+  --ink-2: #2a2a27;
+  --ink-3: #6e6e68;
+  --line: #c8cdd5;
+  --line-soft: #c8cdd5;
+  --panel: #dee2e8;
+  --panel-2: #d3d7df;
+  --pass: #1a5c2e;
+}
+:root { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+</style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
