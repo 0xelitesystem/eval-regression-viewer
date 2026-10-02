@@ -2,9 +2,7 @@
 
 Drop two eval-run files (JSONL, JSON array, or CSV) and get a case-by-case regression diff: new failures, new passes, score deltas, and flaky cases, all in your browser.
 
-## Live demo
-
-https://0xelitesystem.github.io/eval-regression-viewer/
+**Live demo:** https://0xelitesystem.github.io/eval-regression-viewer/
 
 ## Features
 
@@ -28,9 +26,34 @@ https://0xelitesystem.github.io/eval-regression-viewer/
 
 This tool is the missing "read the results" step for the eval repos in the same portfolio: run your suites with [claude-eval-harness](https://github.com/0xelitesystem/claude-eval-harness), build cases from [llm-eval-datasets-starter](https://github.com/0xelitesystem/llm-eval-datasets-starter), grade with [rag-evaluation-rubrics](https://github.com/0xelitesystem/rag-evaluation-rubrics), then diff the runs here.
 
+## Use
+
+1. Load a baseline run (Run A) and a candidate run (Run B) by dropping files, using Choose file, or pasting text. Or click Load demo runs.
+2. Optionally add more runs with + Add run (flake detection).
+3. Check the case id and outcome fields in Field mapping, and set the pass threshold and regression delta if your outcomes are scores.
+4. Read the summary tiles and filter the results table by category.
+5. Click Copy markdown report or Download diff CSV.
+
+## Why this exists
+
+Comparing two eval runs by eye hides which cases regressed and which are just flaky. This joins the runs case by case in a single HTML file with no upload and no tracking, under the MIT license, so eval data never leaves your machine.
+
 ## Privacy
 
 Everything runs in your browser. Files are read locally with the FileReader API and never uploaded; there are no analytics, no network requests, and no external dependencies. The only thing stored is your theme preference, in localStorage.
+
+## Run locally
+
+```
+git clone https://github.com/0xelitesystem/eval-regression-viewer
+cd eval-regression-viewer
+```
+
+Open `index.html` in a browser. Or serve the folder with `python -m http.server` and visit http://localhost:8000.
+
+## Build
+
+No build step. The whole tool is one `index.html` file with inline CSS and JavaScript, and no dependencies.
 
 ## More
 
