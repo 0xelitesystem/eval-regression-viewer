@@ -24,7 +24,7 @@ Drop two eval-run files (JSONL, JSON array, or CSV) and get a case-by-case regre
 3. The diff engine categorizes every case. A score move beyond the regression-delta threshold counts as regressed or improved; a pass flip counts as a new failure or new pass; cases missing on one side are tracked as coverage changes. With three or more runs, an outcome that flips at least twice across runs is flagged flaky.
 4. Read the tiles, drill into a category with the filter chips, expand rows to compare raw records, then copy the markdown report into a PR or download the CSV.
 
-This tool is the missing "read the results" step for the eval repos in the same portfolio: run your suites with [claude-eval-harness](https://github.com/0xelitesystem/claude-eval-harness), build cases from [llm-eval-datasets-starter](https://github.com/0xelitesystem/llm-eval-datasets-starter), grade with [rag-evaluation-rubrics](https://github.com/0xelitesystem/rag-evaluation-rubrics), then diff the runs here.
+This tool is the missing "read the results" step for the eval repos in the same portfolio: run your suites with [prompt-model-side-by-side](https://github.com/0xelitesystem/prompt-model-side-by-side), build cases from [llm-eval-datasets-starter](https://github.com/0xelitesystem/llm-eval-datasets-starter), grade with [rag-evaluation-rubrics](https://github.com/0xelitesystem/rag-evaluation-rubrics), then diff the runs here.
 
 ## Use
 
